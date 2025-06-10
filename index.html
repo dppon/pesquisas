@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Área de Trabalho - Central de Projetos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* bg-slate-50 */
+        }
+        /* Animações e transições */
+        .fade-out { animation: fadeOut 0.5s forwards; }
+        .fade-in { animation: fadeIn 0.5s forwards; opacity: 0; }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; display: none; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .progress-bar-bg { background-color: #e2e8f0; } /* bg-slate-200 */
+        .progress-bar-fill { transition: width 0.5s ease-in-out; }
+        
+        /* Estilos do Checklist */
+        .milestone-header { cursor: pointer; transition: background-color 0.2s ease; }
+        .milestone-header:hover { background-color: #f1f5f9; } /* bg-slate-100 */
+        .milestone-content { max-height: 0; overflow: hidden; transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .milestone-content.expanded { max-height: 1000px; }
+        .milestone-header.done { background-color: #f0fdf4; } /* bg-green-50 */
+        .milestone-header.done h2 { color: #166534; } /* text-green-800 */
+        .task-label { transition: color 0.2s ease; }
+        input:checked + .task-label { text-decoration: line-through; color: #64748b; } /* text-slate-500 */
+        .icon-transition { transition: transform 0.3s ease-in-out; }
+        .rotate-90 { transform: rotate(90deg); }
+
+        /* Estilo para modal */
+        .modal-backdrop {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content {
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Tela de Login (simulada) -->
+    <div id="login-screen" class="fixed inset-0 bg-gradient-to-br from-[#00255a] to-[#0055b3] flex flex-col items-center justify-center z-50 p-4">
+        <div class="text-center">
+            <h1 class="text-4xl sm:text-5xl font-bold text-white mb-4">Bem-vindo</h1>
+            <p class="text-white/80 text-lg mb-8">Sua plataforma de gestão estratégica.</p>
+            <button id="enter-workspace-btn" class="bg-[#c8690a] hover:bg-[#f48c21] text-white font-bold py-3 px-8 rounded-lg shadow-xl transform hover:scale-105 transition-transform duration-300">
+                Acessar Plataforma
+            </button>
+        </div>
+    </div>
+
+    <!-- Container Principal da Aplicação -->
+    <div id="app-container" class="opacity-0">
+        <header class="bg-white shadow-sm sticky top-0 z-40 border-b border-slate-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-slate-100 rounded-lg">
+                           <svg class="h-6 w-6 text-[#00255a]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                        </div>
+                        <span class="text-xl font-bold text-slate-800">Workspace</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right hidden sm:block">
+                            <p class="text-sm font-semibold text-slate-800">Kelvin Cristovao</p>
+                            <p id="current-date" class="text-xs text-slate-500"></p>
+                        </div>
+                        <img class="h-10 w-10 rounded-full object-cover ring-2 ring-offset-2 ring-[#00255a]" src="https://placehold.co/100x100/00255A/FFFFFF?text=KC" alt="Foto do Perfil">
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- View da Central de Projetos (Tela Inicial) -->
+        <main id="project-hub-view" class="py-10">
+             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-slate-900">Central de Projetos</h1>
+                        <p class="mt-1 text-slate-600">Selecione um projeto ou cadastre um novo para começar.</p>
+                    </div>
+                    <button id="add-project-btn" class="mt-4 w-full sm:w-auto sm:mt-0 bg-[#c8690a] hover:bg-[#f48c21] text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors duration-300 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                        Cadastrar Novo Projeto
+                    </button>
+                </div>
+                <div id="projects-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Cards dos projetos serão inseridos aqui -->
+                </div>
+                
+                <div id="archived-section" class="mt-16 hidden">
+                    <div class="border-b border-slate-300 mb-8">
+                        <h2 class="text-2xl font-bold text-slate-700 pb-2">Projetos Arquivados</h2>
+                    </div>
+                    <div id="archived-projects-container" class="space-y-4"></div>
+                </div>
+             </div>
+        </main>
+
+        <!-- View do Dashboard de Projeto (Detalhes) -->
+        <div id="project-dashboard-view" class="hidden py-10"></div>
+
+        <!-- View do Plano de Ação (Checklist) -->
+        <div id="action-plan-view" class="hidden py-10"></div>
+    </div>
+    
+    <!-- Modal de Cadastro de Novo Projeto -->
+    <div id="new-project-modal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-backdrop fixed inset-0 bg-black/60"></div>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="modal-content relative bg-white w-full max-w-2xl rounded-lg shadow-2xl transform scale-95 opacity-0">
+                <div class="p-6 border-b"><h2 class="text-2xl font-bold text-slate-900">Cadastrar Novo Projeto</h2></div>
+                <div class="p-6 sm:p-8 flex-grow overflow-y-auto">
+                    <form id="new-project-form" class="space-y-5">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div><label for="company-name" class="block text-sm font-medium text-slate-700">Nome da Empresa</label><input type="text" id="company-name" required class="mt-1 block w-full border border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#c8690a] focus:border-[#c8690a]"></div>
+                            <div><label for="responsible-name" class="block text-sm font-medium text-slate-700">Nome do Responsável</label><input type="text" id="responsible-name" required class="mt-1 block w-full border border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#c8690a] focus:border-[#c8690a]"></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                             <div>
+                                <label for="start-date" class="block text-sm font-medium text-slate-700">Data de Início Padrão</label>
+                                <input type="date" id="start-date" required class="mt-1 block w-full border border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#c8690a] focus:border-[#c8690a]">
+                            </div>
+                            <div>
+                                <label for="end-date" class="block text-sm font-medium text-slate-700">Data de Conclusão Padrão</label>
+                                <input type="date" id="end-date" required class="mt-1 block w-full border border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#c8690a] focus:border-[#c8690a]">
+                            </div>
+                        </div>
+                        <div><label class="block text-sm font-medium text-slate-700">Marcos a Utilizar no Projeto</label><div id="milestones-selection" class="mt-2 space-y-2 max-h-40 overflow-y-auto p-2 border rounded-md"></div></div>
+                        <div><label for="observations" class="block text-sm font-medium text-slate-700">Informações e Observações</label><textarea id="observations" rows="3" class="mt-1 block w-full border border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#c8690a] focus:border-[#c8690a]" placeholder="Adicione notas..."></textarea></div>
+                    </form>
+                </div>
+                <div class="p-6 border-t flex justify-end"><button type="submit" form="new-project-form" class="bg-[#00255a] hover:bg-[#003c8f] text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-300">Salvar Projeto</button></div>
+                <button id="close-modal-btn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Estrutura de Dados ---
+        const allMilestonesMaster = [
+            { id: 'm1', title: 'Marco 01 – Diagnóstico & Análise', startDate: '', endDate: '', tasks: [ { id: 't1-0', text: '<strong>1.0 Análise e Diagnóstico:</strong> Levantamento completo.', checked: false }, { id: 't1-1', text: '<strong>1.1 Modelo de Negócios & PMVV:</strong> Canvas e Painel.', checked: false }, { id: 't1-2', text: '<strong>1.2 Organograma & Hierarquia:</strong> Mapeamento.', checked: false }, { id: 't1-3', text: '<strong>1.3 Análise SWOT:</strong> Forças e Fraquezas.', checked: false }, { id: 't1-4', text: '<strong>1.4 Diagrama Espinha de Peixe:</strong> Causas-raiz.', checked: false }, { id: 't1-5', text: '<strong>1.5 Reunião de Alinhamento:</strong> Metas SMART.', checked: false }, { id: 't1-6', text: '<strong>1.6 Relatório Final (7S):</strong> Documento consolidado.', checked: false } ]},
+            { id: 'm2', title: 'Marco 02 – Processos & Planejamento', startDate: '', endDate: '', tasks: [ { id: 't2-0', text: '<strong>2.0 Mapeamento de Processos:</strong> SIPOC.', checked: false }, { id: 't2-1', text: '<strong>2.1 Revisão do Organograma:</strong> Ajustes.', checked: false }, { id: 't2-2', text: '<strong>2.2 Plano de Ação & POPs:</strong> 5W2H.', checked: false }, { id: 't2-3', text: '<strong>2.3 Planejamento Estratégico:</strong> Cronograma.', checked: false }, { id: 't2-4', text: '<strong>2.4 Treinamento Pré-implantação:</strong> Capacitação.', checked: false }, { id: 't2-5', text: '<strong>2.5 Reunião RESET Cultural:</strong> Apresentação.', checked: false } ]},
+            { id: 'm3', title: 'Marco 03 – Implantação de RH', startDate: '', endDate: '', tasks: [ { id: 't3-0', text: '<strong>3.0 Implantação dos Subsistemas de RH:</strong> Kick-off.', checked: false }, { id: 't3-1', text: '<strong>3.1 Subsistema de Reuniões:</strong> Estrutura.', checked: false }, { id: 't3-2', text: '<strong>3.2 Avaliação de Desempenho:</strong> Metodologia.', checked: false }, { id: 't3-3', text: '<strong>3.3 PDI & Feedback:</strong> Ciclo de desenvolvimento.', checked: false }, { id: 't3-4', text: '<strong>3.4 Treinamento & Desenvolvimento:</strong> Trilhas.', checked: false }, { id: 't3-5', text: '<strong>3.5 R&S:</strong> Fluxo completo.', checked: false } ]},
+            { id: 'm4', title: 'Marco 04 – Acompanhamento & Engajamento', startDate: '', endDate: '', tasks: [ { id: 't4-0', text: '<strong>4.0 Acompanhamento & Auditoria:</strong> Dashboards.', checked: false }, { id: 't4-1', text: '<strong>4.1 Acompanhamento Quinzenal:</strong> Reuniões.', checked: false }, { id: 't4-2', text: '<strong>4.2 Auditoria Trimestral:</strong> Revisão.', checked: false }, { id: 't4-3', text: '<strong>4.3 Assessoria de R&S:</strong> Suporte.', checked: false }, { id: 't4-4', text: '<strong>4.4 Campanhas de Engajamento:</strong> Gamificação.', checked: false }, { id: 't4-5', text: '<strong>4.5 Avaliação da Diretoria:</strong> Feedback 360°.', checked: false } ]},
+            { id: 'm5', title: 'Marco 05 – Tecnologia & Dados', startDate: '', endDate: '', tasks: [ { id: 't5-0', text: '<strong>5.0 Gestão de Tecnologia:</strong> Kick-off TI.', checked: false }, { id: 't5-1', text: '<strong>5.1 Plataformas & Aplicações:</strong> Avaliação.', checked: false }, { id: 't5-2', text: '<strong>5.2 Plataforma Integrada:</strong> Implementação.', checked: false }, { id: 't5-3', text: '<strong>5.3 Centralização de Dados:</strong> Dashboards.', checked: false }, { id: 't5-4', text: '<strong>5.4 Suporte Contínuo:</strong> SLA.', checked: false }, { id: 't5-5', text: '<strong>5.5 Releases Trimestrais:</strong> Melhoria.', checked: false } ]}
+        ];
+
+        let projectsData = [
+            { id: 'proj-01', companyName: 'Empresa Exemplo S.A.', responsibleName: 'Ana Silva', observations: 'Projeto piloto para teste da nova metodologia.', status: 'Em andamento', statusColor: 'blue', isArchived: false,
+                milestones: [
+                    { ...JSON.parse(JSON.stringify(allMilestonesMaster[0])), startDate: '2025-06-01', endDate: '2025-07-15' },
+                    { ...JSON.parse(JSON.stringify(allMilestonesMaster[1])), startDate: '2025-07-16', endDate: '2025-08-31' },
+                    { ...JSON.parse(JSON.stringify(allMilestonesMaster[4])), startDate: '2025-07-01', endDate: '2025-10-30' }
+                ]
+            },
+        ];
+
+        // --- INICIALIZAÇÃO DA APLICAÇÃO ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('enter-workspace-btn')?.addEventListener('click', () => {
+                document.getElementById('login-screen').classList.add('fade-out');
+                document.getElementById('app-container').classList.add('fade-in');
+                document.getElementById('app-container').style.opacity = '1';
+            });
+            const dateElement = document.getElementById('current-date');
+            if (dateElement) dateElement.textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('add-project-btn').addEventListener('click', openNewProjectModal);
+            document.getElementById('close-modal-btn').addEventListener('click', closeNewProjectModal);
+            document.querySelector('.modal-backdrop').addEventListener('click', closeNewProjectModal);
+            document.getElementById('new-project-form').addEventListener('submit', handleNewProjectSubmit);
+            renderProjectHub();
+        });
+        
+        // --- FUNÇÕES DE NAVEGAÇÃO E RENDERIZAÇÃO ---
+        function showView(viewId) { ['project-hub-view', 'project-dashboard-view', 'action-plan-view'].forEach(id => document.getElementById(id).classList.add('hidden')); document.getElementById(viewId).classList.remove('hidden'); }
+        function renderProjectHub() {
+            showView('project-hub-view');
+            const activeProjects = projectsData.filter(p => !p.isArchived);
+            const archivedProjects = projectsData.filter(p => p.isArchived);
+            const activeContainer = document.getElementById('projects-list-container');
+            activeContainer.innerHTML = activeProjects.length > 0 ? '' : '<p class="text-slate-500 md:col-span-3 text-center">Nenhum projeto ativo.</p>';
+            activeProjects.forEach(project => activeContainer.appendChild(createProjectCard(project)));
+            const archivedSection = document.getElementById('archived-section');
+            const archivedContainer = document.getElementById('archived-projects-container');
+            if (archivedProjects.length > 0) {
+                archivedSection.classList.remove('hidden');
+                archivedContainer.innerHTML = '';
+                archivedProjects.forEach(project => archivedContainer.appendChild(createArchivedProjectCard(project)));
+            } else {
+                archivedSection.classList.add('hidden');
+            }
+            addHubListeners();
+        }
+        function createProjectCard(project) { const resultsProgress = calculateProjectCompletion(project); const card = document.createElement('div'); card.className = 'bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between'; card.innerHTML = `<div><div class="flex justify-between items-start"><h3 class="text-lg font-bold text-slate-900 pr-4">${project.companyName}</h3><div class="flex-shrink-0 flex space-x-1"><button title="Arquivar" data-project-id="${project.id}" class="archive-btn p-1 text-slate-400 hover:text-blue-600 rounded-full hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fill-rule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clip-rule="evenodd" /></svg></button><button title="Excluir" data-project-id="${project.id}" class="delete-btn p-1 text-slate-400 hover:text-red-600 rounded-full hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg></button></div></div><p class="text-sm text-slate-500 mt-1">Responsável: ${project.responsibleName}</p></div><div class="mt-4"><div class="flex justify-between text-xs text-slate-500 mb-1"><span>Resultados</span><span class="font-semibold">${Math.round(resultsProgress)}%</span></div><div class="w-full progress-bar-bg rounded-full h-2.5"><div class="progress-bar-fill ${resultsProgress === 100 ? 'bg-green-500' : 'bg-blue-600'} h-2.5 rounded-full" style="width: ${resultsProgress}%"></div></div><button data-project-id="${project.id}" class="view-dashboard-btn w-full mt-4 bg-[#00255a] hover:bg-[#003c8f] text-white font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-300">Gerenciar Projeto</button></div>`; return card; }
+        function createArchivedProjectCard(project) { const card = document.createElement('div'); card.className = 'bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col sm:flex-row justify-between items-center'; card.innerHTML = `<div class="flex-1 mb-3 sm:mb-0 text-center sm:text-left"><h4 class="font-semibold text-slate-600">${project.companyName}</h4><p class="text-sm text-slate-500">Conclusão: ${new Date(project.milestones.slice(-1)[0]?.endDate || Date.now()).toLocaleDateString('pt-BR')} - ${calculateProjectCompletion(project).toFixed(0)}% das tarefas completas.</p></div><div class="flex space-x-2"><button title="Restaurar" data-project-id="${project.id}" class="unarchive-btn p-2 text-slate-500 hover:text-blue-600 rounded-md hover:bg-slate-200 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V4a2 2 0 00-2-2H5zm3 5a1 1 0 000 2h2a1 1 0 100-2H8z" clip-rule="evenodd" /></svg></button><button title="Excluir Permanentemente" data-project-id="${project.id}" class="delete-btn p-2 text-slate-500 hover:text-red-600 rounded-md hover:bg-slate-200 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg></button></div>`; return card; }
+        function addHubListeners() { document.querySelectorAll('.view-dashboard-btn').forEach(b => b.addEventListener('click', (e) => renderProjectDashboard(e.target.closest('button').dataset.projectId))); document.querySelectorAll('.archive-btn').forEach(b => b.addEventListener('click', (e) => archiveProject(e.target.closest('button').dataset.projectId))); document.querySelectorAll('.unarchive-btn').forEach(b => b.addEventListener('click', (e) => unarchiveProject(e.target.closest('button').dataset.projectId))); document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', (e) => deleteProject(e.target.closest('button').dataset.projectId))); }
+        function renderProjectDashboard(projectId) { const project = projectsData.find(p => p.id === projectId); if (!project) return; showView('project-dashboard-view'); const view = document.getElementById('project-dashboard-view'); view.innerHTML = `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><button id="back-to-hub-btn-1" class="inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-900 mb-6 group"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>Voltar para Central de Projetos</button><div class="mb-8"><h1 class="text-3xl font-bold text-slate-900">${project.companyName}</h1><p class="mt-1 text-slate-600">Dashboard de acompanhamento do projeto.</p></div><div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8"><div class="lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200 shadow-sm"><h2 class="text-lg font-semibold text-slate-800 mb-4">Linha do Tempo dos Marcos</h2><div class="relative h-96"><canvas id="ganttChart"></canvas></div></div><div class="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center"><h2 class="text-lg font-semibold text-slate-800 mb-4">Conclusão de Tarefas (Geral)</h2><div class="relative w-full h-80 sm:h-96"><canvas id="resultsChart"></canvas></div></div></div><div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm text-center"><button data-project-id="${project.id}" class="action-plan-btn bg-[#c8690a] hover:bg-[#f48c21] text-white font-bold py-3 px-8 rounded-lg shadow-xl">Acessar Plano de Ação Detalhado</button></div></div>`; document.getElementById('back-to-hub-btn-1').addEventListener('click', renderProjectHub); document.querySelector('.action-plan-btn').addEventListener('click', (e) => showActionPlan(e.target.dataset.projectId)); renderCharts(project); }
+        function showActionPlan(projectId) { const project = projectsData.find(p => p.id === projectId); if (!project) return; showView('action-plan-view'); const view = document.getElementById('action-plan-view'); view.dataset.projectId = projectId; view.innerHTML = `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"><button id="back-to-dashboard-btn" class="inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-900 mb-6 group"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>Voltar ao Dashboard</button><header class="mb-8 p-6 bg-white rounded-xl shadow-md border border-slate-200"><h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">${project.companyName} - Plano de Ação</h1><div class="space-y-3"><div><div class="flex justify-between items-center text-sm font-medium"><span class="text-slate-700">Progresso Geral (Resultados)</span><span id="main-progress-text" class="text-blue-600 font-semibold">0%</span></div><div class="w-full progress-bar-bg rounded-full h-3 shadow-inner mt-1"><div id="main-progress-bar" class="progress-bar-fill bg-blue-600 h-3 rounded-full" style="width: 0%;"></div></div></div></div></header><div id="milestones-container" class="space-y-4"></div></div>`; renderMilestones(project); document.getElementById('back-to-dashboard-btn').addEventListener('click', () => renderProjectDashboard(projectId)); }
+
+        // --- LÓGICA do MODAL ---
+        function openNewProjectModal() { const modal = document.getElementById('new-project-modal'); const selectionContainer = document.getElementById('milestones-selection'); selectionContainer.innerHTML = allMilestonesMaster.map(m => `<label class="flex items-center space-x-3 p-2 border rounded-md cursor-pointer hover:bg-slate-50"><input type="checkbox" name="milestones" value="${m.id}" class="h-4 w-4 rounded text-[#00255a] focus:ring-[#c8690a]"><span class="text-sm font-medium text-slate-800">${m.title}</span></label>`).join(''); modal.classList.remove('hidden'); setTimeout(() => modal.querySelector('.modal-content').classList.replace('opacity-0', 'opacity-100'), 10); setTimeout(() => modal.querySelector('.modal-content').classList.replace('scale-95', 'scale-100'), 10); }
+        function closeNewProjectModal() { const modal = document.getElementById('new-project-modal'); modal.querySelector('.modal-content').classList.replace('opacity-100', 'opacity-0'); modal.querySelector('.modal-content').classList.replace('scale-100', 'scale-95'); setTimeout(() => { modal.classList.add('hidden'); document.getElementById('new-project-form').reset(); }, 300); }
+        function handleNewProjectSubmit(e) {
+            e.preventDefault();
+            const selectedMilestones = allMilestonesMaster
+                .filter(m => document.querySelector(`input[name="milestones"][value="${m.id}"]`).checked)
+                .map(m => {
+                    const milestoneCopy = JSON.parse(JSON.stringify(m));
+                    milestoneCopy.startDate = document.getElementById('start-date').value;
+                    milestoneCopy.endDate = document.getElementById('end-date').value;
+                    return milestoneCopy;
+                });
+            const newProject = {
+                id: 'proj-' + Date.now(),
+                companyName: document.getElementById('company-name').value,
+                responsibleName: document.getElementById('responsible-name').value,
+                observations: document.getElementById('observations').value,
+                status: 'Não iniciado', statusColor: 'gray', isArchived: false, milestones: selectedMilestones
+            };
+            projectsData.push(newProject);
+            closeNewProjectModal();
+            renderProjectHub();
+        }
+        
+        // --- LÓGICA DE DADOS E EVENTOS ---
+        function archiveProject(projectId) { const project = projectsData.find(p => p.id === projectId); if(project) { project.isArchived = true; renderProjectHub(); }}
+        function unarchiveProject(projectId) { const project = projectsData.find(p => p.id === projectId); if(project) { project.isArchived = false; renderProjectHub(); }}
+        function deleteProject(projectId) { if(confirm('Tem certeza que deseja excluir este projeto permanentemente?')) { projectsData = projectsData.filter(p => p.id !== projectId); renderProjectHub(); }}
+        function calculateProjectCompletion(project) { if(!project.milestones || project.milestones.length === 0) return 0; const allTasks = project.milestones.flatMap(m => m.tasks); if (allTasks.length === 0) return 0; const completedTasks = allTasks.filter(t => t.checked).length; return (completedTasks / allTasks.length) * 100; }
+        
+        // --- RENDERIZAÇÃO E LÓGICA DO PLANO DE AÇÃO ---
+        function renderMilestones(project) {
+            const container = document.getElementById('milestones-container');
+            container.innerHTML = project.milestones.length > 0 ? '' : '<p class="text-slate-500 text-center py-8">Nenhum marco selecionado para este projeto.</p>';
+            project.milestones.forEach(milestone => {
+                const el = document.createElement('div');
+                el.className = 'bg-white rounded-xl shadow-sm border border-slate-200';
+                el.id = milestone.id;
+                el.innerHTML = `<div class="milestone-header p-4 sm:p-5 flex justify-between items-center"><div class="flex-1"><h2 class="font-bold text-lg text-slate-800">${milestone.title}</h2><div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 text-xs text-slate-500 mt-2"><div><label for="${milestone.id}-start-date" class="font-medium">Início:</label><input type="date" id="${milestone.id}-start-date" data-milestone-id="${milestone.id}" value="${milestone.startDate}" class="milestone-date-input ml-2 p-1 border rounded-md bg-slate-50"></div><div><label for="${milestone.id}-end-date" class="font-medium">Fim:</label><input type="date" id="${milestone.id}-end-date" data-milestone-id="${milestone.id}" value="${milestone.endDate}" class="milestone-date-input ml-2 p-1 border rounded-md bg-slate-50"></div></div><div class="w-full progress-bar-bg rounded-full h-2.5 mt-3"><div class="milestone-progress-bar progress-bar-fill bg-blue-600 h-2.5 rounded-full" style="width: 0%;"></div></div></div><div class="ml-4 text-slate-400"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 chevron-icon icon-transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg></div></div><div class="milestone-content border-t border-slate-200">${milestone.tasks.map(task => `<div class="flex items-center p-3 border-b border-slate-100 last:border-b-0"><input type="checkbox" id="${task.id}" class="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer task-checkbox" ${task.checked ? 'checked' : ''}><label for="${task.id}" class="ml-3 block text-sm text-slate-700 task-label cursor-pointer">${task.text}</label></div>`).join('')}</div>`;
+                container.appendChild(el);
+            });
+            addChecklistListeners();
+            updateAllProgress();
+            const firstMilestone = document.querySelector('.milestone-header');
+            if(firstMilestone) toggleMilestone(firstMilestone);
+        }
+
+        function addChecklistListeners() {
+            document.querySelectorAll('.milestone-header').forEach(h => h.addEventListener('click', (e) => { if(!e.target.closest('.milestone-date-input')) toggleMilestone(h); }));
+            document.querySelectorAll('.milestone-date-input').forEach(input => input.addEventListener('change', handleMilestoneDateChange));
+            document.querySelectorAll('.task-checkbox').forEach(cb => cb.addEventListener('change', (e) => { const taskId = e.target.id; const projectId = e.target.closest('#action-plan-view').dataset.projectId; const project = projectsData.find(p => p.id === projectId); const task = project.milestones.flatMap(m => m.tasks).find(t => t.id === taskId); if (task) task.checked = e.target.checked; updateAllProgress(); }));
+        }
+
+        function handleMilestoneDateChange(e) { const milestoneId = e.target.dataset.milestoneId; const projectId = e.target.closest('#action-plan-view').dataset.projectId; const project = projectsData.find(p => p.id === projectId); const milestone = project.milestones.find(m => m.id === milestoneId); if (milestone) milestone[e.target.id.includes('start-date') ? 'startDate' : 'endDate'] = e.target.value; }
+        function toggleMilestone(header) { header.nextElementSibling.classList.toggle('expanded'); header.querySelector('.chevron-icon').classList.toggle('rotate-90'); }
+        
+        function updateAllProgress() {
+            const view = document.getElementById('action-plan-view');
+            if (view.classList.contains('hidden')) return;
+            const projectId = view.dataset.projectId;
+            const project = projectsData.find(p => p.id === projectId);
+            if (!project) return;
+            project.milestones.forEach(milestone => {
+                const tasks = milestone.tasks;
+                const completed = tasks.filter(t => t.checked).length;
+                const percent = tasks.length > 0 ? (completed / tasks.length) * 100 : 0;
+                const el = document.getElementById(milestone.id);
+                if (el) { const bar = el.querySelector('.milestone-progress-bar'); bar.style.width = `${percent}%`; el.querySelector('.milestone-header').classList.toggle('done', percent === 100); bar.classList.toggle('bg-green-500', percent === 100); bar.classList.toggle('bg-blue-600', percent < 100); }
+            });
+            const totalPercent = calculateProjectCompletion(project);
+            document.getElementById('main-progress-bar').style.width = `${totalPercent}%`;
+            document.getElementById('main-progress-text').textContent = `${Math.round(totalPercent)}%`;
+            document.getElementById('main-progress-bar').classList.toggle('bg-green-500', totalPercent === 100);
+        }
+
+        // --- LÓGICA DOS GRÁFICOS ---
+        function renderCharts(project) {
+            renderMilestoneChart(project);
+            renderResultsChart([project]);
+        }
+        
+        function renderMilestoneChart(project) {
+             if(window.ganttChartInstance) window.ganttChartInstance.destroy();
+             const wrapper = document.getElementById('ganttChart')?.parentNode;
+             if(!wrapper) return;
+             wrapper.innerHTML = '<canvas id="ganttChart"></canvas>';
+             const ganttCtx = document.getElementById('ganttChart');
+             if(!ganttCtx) return;
+
+             const data = project.milestones.filter(m => m.startDate && m.endDate);
+             
+             if (data.length === 0) {
+                 ganttCtx.parentNode.innerHTML = '<div class="flex items-center justify-center h-full text-slate-500"><p>Adicione datas aos marcos para visualizar a linha do tempo.</p></div>';
+                 return;
+             }
+
+             const allDates = data.flatMap(m => [new Date(m.startDate), new Date(m.endDate)]);
+             let minDate = new Date(Math.min.apply(null, allDates));
+             let maxDate = new Date(Math.max.apply(null, allDates));
+             minDate.setMonth(minDate.getMonth() - 1);
+             maxDate.setMonth(maxDate.getMonth() + 1);
+             const formatYYYYMMDD = (d) => d.toISOString().split('T')[0];
+
+             const milestoneColors = ['rgba(59, 130, 246, 0.7)', 'rgba(244, 114, 182, 0.7)', 'rgba(34, 197, 94, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(139, 92, 246, 0.7)'];
+             window.ganttChartInstance = new Chart(ganttCtx, {
+                 type: 'bar',
+                 data: { labels: data.map(m => m.title), datasets: [{ label: 'Duração do Marco', data: data.map(m => [m.startDate, m.endDate]), backgroundColor: data.map((_, i) => milestoneColors[i % milestoneColors.length]), borderWidth: 1, borderSkipped: false }] },
+                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { type: 'time', time: { unit: 'month' }, min: formatYYYYMMDD(minDate), max: formatYYYYMMDD(maxDate) } } }
+             });
+        }
+        
+        function renderResultsChart(projects) {
+            if(window.resultsChartInstance) window.resultsChartInstance.destroy();
+            const resultsCtx = document.getElementById('resultsChart');
+            if(resultsCtx) {
+                const totalCompletion = projects.reduce((sum, p) => sum + calculateProjectCompletion(p), 0);
+                const averageCompletion = projects.length > 0 ? totalCompletion / projects.length : 0;
+                window.resultsChartInstance = new Chart(resultsCtx, {
+                    type: 'doughnut',
+                    data: { labels: ['Concluído', 'Pendente'], datasets: [{ data: [averageCompletion, 100 - averageCompletion], backgroundColor: ['#2563eb', '#e5e7eb'], borderColor: ['#ffffff'], borderWidth: 4, hoverOffset: 8 }] },
+                    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw.toFixed(1)}%` } } } }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
